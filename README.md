@@ -11,6 +11,13 @@ The bulk of the formatting is handled in the LaTeX input file.  The `mathymath`
 program has various options for specifying how many problems of different types,
 limits on numbers involved, etc.
 
+# Sample Worksheet
+[Example mathymath generated worksheet](images/worksheet.png)
+
+# Sample Quiz/Test
+[Example mathymath generated test](images/test.png)
+
+
 # Usage
 ## Help Output
 To obtain a full list of `mathymath` options, use
@@ -64,4 +71,5 @@ short and funny.  Inappropriate quotes will not be accepted but this is
 free software so you are of course always welcome to create your own fork.
 - Submissions should be made by creating a fork on github and then submitting
 a pull request.
+
 
