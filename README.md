@@ -12,10 +12,10 @@ program has various options for specifying how many problems of different types,
 limits on numbers involved, etc.
 
 # Sample Worksheet
-[Example mathymath generated worksheet](images/worksheet.png)
+![Example mathymath generated worksheet](images/worksheet.png)
 
 # Sample Quiz/Test
-[Example mathymath generated test](images/test.png)
+![Example mathymath generated test](images/test.png)
 
 
 # Usage
