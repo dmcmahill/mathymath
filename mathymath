@@ -1,0 +1,556 @@
+#!/usr/bin/env python3
+#
+
+# import datetime
+import logging
+import random
+
+# import re
+import sys
+from pathlib import Path
+
+
+def parse_arguments():
+    """
+    Parse command line arguments.
+
+    Returns:
+        args structure.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="mathymath Usage", formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+
+    parser.add_argument(
+        "--num_add", type=int, default=12, help="specify how many addition problems.",
+    )
+    parser.add_argument(
+        "--num_addx", type=int, default=0, help="specify how many challenge addition problems",
+    )
+
+    parser.add_argument(
+        "--num_sub", type=int, default=8, help="specify how many subtraction problems",
+    )
+
+    parser.add_argument(
+        "--num_subx", type=int, default=0, help="specify how many challenge subtraction problems",
+    )
+
+    parser.add_argument(
+        "--min_num",
+        type=int,
+        default=0,
+        help="specify the minimum number involved in additon/subtraction problems",
+    )
+
+    parser.add_argument(
+        "--max_num",
+        type=int,
+        default=12,
+        help="specify the maximum number involved in additon/subtraction problems",
+    )
+
+    parser.add_argument(
+        "--num_mul", type=int, default=0, help="specify how many multiplication problems",
+    )
+
+    parser.add_argument(
+        "--num_div", type=int, default=0, help="specify how many division problems",
+    )
+
+    parser.add_argument(
+        "--min_mul",
+        type=int,
+        default=0,
+        help="specify the minimum values in multiplication problems",
+    )
+
+    parser.add_argument(
+        "--max_mul",
+        type=int,
+        default=12,
+        help="specify the maximum values in multiplication problems",
+    )
+
+    parser.add_argument(
+        "--skip-random", action="store_true", help="do not randomize problem order."
+    )
+
+    parser.add_argument("--horizontal-mode", action="store_true", help="use horizontal format.")
+
+    parser.add_argument(
+        "--test-mode", action="store_true", help="use test comments instead of worksheet comments."
+    )
+
+    parser.add_argument(
+        "--latex_template",
+        type=str,
+        default="mathymath_template.tex",
+        help="specify the LaTeX template file.",
+    )
+
+    parser.add_argument(
+        "--latex_out", type=str, default="mathymath_out.tex", help="specify the LaTeX output file."
+    )
+
+    parser.add_argument(
+        "--latex_columns", type=int, default=4, help="specify how many columns in the LaTeX output",
+    )
+
+    parser.add_argument(
+        "--latex_rows",
+        type=int,
+        default=10,
+        help="specify how many rows per page in the LaTeX output",
+    )
+
+    parser.add_argument(
+        "--fortune_num", type=int, default=False, help="specify which of the fortunes to use",
+    )
+
+    parser.add_argument(
+        "--name", type=str, default="", help="Add a string to the worksheet/test title."
+    )
+
+    parser.add_argument("--verbose", action="store_true", help="run verbosely.")
+
+    args = parser.parse_args()
+
+    if args.verbose:
+        print("args = {}".format(args))
+
+    return args
+
+
+def print_problems(problems):
+    """Print problems to screen.  Used for debugging/development.
+
+    Args: problems array
+    """
+    for p in problems:
+        print("{} {} {} = {}".format(p["a"], p["type"], p["b"], p["c"]))
+
+
+def check_problems(problems):
+    """Check for characteristics we do not want in a problem array
+    """
+    r = False
+    prev = None
+    for p in problems:
+        if p == prev:
+            print("Identical problems adjacent to each other")
+            r = True
+        prev = p
+    return r
+
+
+def read_fortune(f="quotes.txt", num=False):
+    """Read the fortunes file and pick one at random
+    """
+    fpath = Path(f)
+    quotes = []
+    with fpath.open("r") as fp:
+        for line in fp:
+            line = line.rstrip()
+            line = line.lstrip()
+            if line and not line.startswith("#"):
+                quotes.append(line)
+
+    if num:
+        motd = quotes[num % len(quotes)]
+    else:
+        motd = random.choice(quotes)
+    print("motd = {}".format(motd))
+
+    return motd
+
+
+def update_latex(
+    template,
+    f,
+    problems,
+    num_col=4,
+    num_row=10,
+    id=None,
+    test_mode=False,
+    min_num=0,
+    max_num=0,
+    min_mul=0,
+    max_mul=0,
+    fortune_num=False,
+    name=None,
+):
+    """Read LaTeX template and generate latex file with problems.
+    """
+
+    if name is None:
+        name = ""
+
+    motd = read_fortune(num=fortune_num)
+
+    # map from problem type to LaTeX command
+    cmd_dict = {"+": "addi", "-": "subt", "*": "mult", "/": "divi"}
+
+    output_pre = []
+    output_problems = []
+    output_post = []
+    sec = 0
+    with template.open() as fp:
+        for line in fp:
+            if test_mode:
+                line = line.replace("%% @test@", "")
+            else:
+                line = line.replace("%% @worksheet@", "")
+
+            line = line.replace("@min_num@", "{}".format(min_num))
+            line = line.replace("@max_num@", "{}".format(max_num))
+            line = line.replace("@min_mul@", "{}".format(min_mul))
+            line = line.replace("@max_mul@", "{}".format(max_mul))
+            line = line.replace("@fortune@", "{}".format(motd))
+            line = line.replace("@sheet_name@", "{}".format(name))
+
+            if "@begin-problems@" in line:
+                output_pre.append(line)
+                sec = 1
+            elif "@end-problems@" in line:
+                output_post.append(line)
+                sec = 2
+            elif sec == 0:
+                output_pre.append(line)
+            elif sec == 1:
+                output_problems.append(line)
+            elif sec == 2:
+                output_post.append(line)
+            else:
+                print("ERROR")
+
+    # Write the new content to file:
+    colw = 7.0 / num_col
+
+    rowgap = 0.5
+    with f.open("w") as fp:
+        fp.writelines(output_pre)
+        fp.write("%% This section is generated with the mathymath script\n")
+        if id is not None:
+            fp.write("\\rfoot{{\\small{{ID: {}}}}}\n".format(id))
+
+        first_page = True
+        per_page = num_row * num_col
+
+        need_end_tabular = False
+        for i, p in enumerate(problems):
+            if i % per_page == 0:
+                # do we need to finish the previous page?
+                if not first_page:
+                    fp.write("\\pagebreak\n\n")
+                    first_page = False
+
+                # starting a new page so start a new tabular
+                fp.write("\\begin{tabular}{")
+                need_end_tabular = True
+                for _i in range(num_col):
+                    fp.write("p{{{}in}} ".format(colw))
+                fp.write("}\n")
+            # write the problem
+            fp.write("    \\{}{{{}}}{{{}}} ".format(cmd_dict[p["type"]], p["a"], p["b"]))
+            if i % num_col == (num_col - 1):
+                fp.write("\\\\[{}in]\n".format(rowgap))
+            else:
+                fp.write(" &\n")
+
+            # see if we need to finish a tabular in prep for a new page
+            if i % per_page == (per_page - 1):
+                fp.write("\end{tabular}\n")
+                need_end_tabular = False
+
+        if need_end_tabular:
+            fp.write("\end{tabular}\n")
+
+        fp.writelines(output_post)
+
+
+def main(pname, args):
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+    num_add = args.num_add
+    num_addx = args.num_addx
+    num_sub = args.num_sub
+    num_subx = args.num_subx
+    min_num = args.min_num
+    max_num = args.max_num
+
+    num_mul = args.num_mul
+    num_div = args.num_div
+    min_mul = args.min_mul
+    max_mul = args.max_mul
+
+    problems = []
+    used_problems = {}
+
+    print("{} Addition Problems".format(num_add))
+    a_vals = list(range(min_num, max_num + 1))
+    b_vals_all = []
+    b_vals_cnt = []
+    b_vals_max = []
+    for a in a_vals:
+        b_vals_all.append(list(range(min_num, max_num - a + 1)))
+        b_vals_cnt.append(0)
+        b_vals_max.append(max_num + 1 - a)
+
+    all_add_problems = []
+    max_unique_add = 0
+    for a in range(min_num, max_num + 1):
+        for b in range(min_num, max_num + 1 - a):
+            c = a + b
+            all_add_problems.append({"type": "+", "a": a, "b": b, "c": c})
+            max_unique_add += 1
+
+    # The number of choices for the 2nd number for a given
+    # first number are:
+    #  0 : (max_num + 1)
+    #  1 : max_num
+    #  2 : (max_num - 1)
+    #  ...
+    #  max_num : 1
+    # = sum from i=1 to i=(max_num + 1) (i)
+    # = (max_num + 1) * (max_num + 2) / 2
+    # max_unique_add = (max_num + 1) * (max_num + 2) // 2
+    print(
+        "maximum number of unique addition problems for max_num = {} is {}".format(
+            max_num, max_unique_add
+        )
+    )
+    # maybe one way is to enumerate all the problems and randomly select.
+
+    for i in range(num_add):
+        idx = i % max_unique_add
+        if idx == 0:
+            # shuffle our deck of
+            all_add_problems = random.sample(all_add_problems, k=max_unique_add)
+        p = all_add_problems[idx]
+        problems.append(p)
+        key = "{} + {}".format(p["a"], p["b"])
+        if key in used_problems:
+            print("WARNING:  Duplicate problem: {}".format(key))
+        used_problems[key] = True
+
+    # "Extra" problems.  These are things like long addition or long subtraction
+
+    problemsx = []
+    max_addx = 100000
+    for _i in range(num_addx):
+        a = random.randint(0, max_addx)
+        b = random.randint(0, max_addx)
+        c = a + b
+        p = {"type": "+", "a": a, "b": b, "c": c}
+        problemsx.append(p)
+        key = "{} + {}".format(p["a"], p["b"])
+        if key in used_problems:
+            print("WARNING:  Duplicate problem: {}".format(key))
+        used_problems[key] = True
+
+    max_subx = 100000
+    for _i in range(num_subx):
+        a = random.randint(0, max_subx)
+        b = random.randint(0, max_subx)
+        if b > a:
+            tmp = b
+            b = a
+            a = tmp
+        c = a - b
+        p = {"type": "-", "a": a, "b": b, "c": c}
+        problemsx.append(p)
+        key = "{} - {}".format(p["a"], p["b"])
+        if key in used_problems:
+            print("WARNING:  Duplicate problem: {}".format(key))
+        used_problems[key] = True
+    # j = -1
+    # for _i in range(num_add):
+    #     need_a = True
+    #     a_cnt = -1
+    #     while(need_a):
+    #         a_cnt = a_cnt + 1
+    #         j = j + 1
+    #         idx = j % (max_num + 1)
+    #         # using sampling without replacement to better cover the space of
+    #         # a values.
+    #         if idx == 0:
+    #             logging.debug("Reshuffle the a values:  {} -->".format(a_vals))
+    #             a_vals = random.sample(a_vals, k=len(a_vals))
+    #             logging.debug("                      :  {}".format(a_vals))
+    #         #a = random.randint(0, max_num)
+    #         a = a_vals[idx]
+    #
+    #         # now, what do do here.  I need to constrain based on the value for a
+    #         # so maybe this is good enough
+    #         # b = random.randint(0, max_num - a)
+    #
+    #         # or, even better, use a similar shuffling approach
+    #         need_b = True
+    #         b_cnt = -1
+    #         while(need_b):
+    #             b_cnt = b_cnt + 1
+    #             idxb = b_vals_cnt[a] % b_vals_max[a]
+    #             if idxb == 0:
+    #                 logging.debug("Reshuffle the b[{:3}] values:  {} -->".format(a, b_vals_all[a]))
+    #                 b_vals_all[a] = random.sample(b_vals_all[a], k=len(b_vals_all[a]))
+    #                 logging.debug("                           :  {}".format(b_vals_all[a]))
+    #             b = b_vals_all[a][idxb]
+    #             b_vals_cnt[a] = b_vals_cnt[a] + 1
+    #
+    #             key = "{} + {}".format(a, b)
+    #             if not key in used_problems or b_cnt == b_vals_max[a]:
+    #                 need_b = False
+    #             else:
+    #                 print("Try again on b for a unique problem")
+    #
+    #         key = "{} + {}".format(a, b)
+    #         if not key in used_problems or a_cnt == max_num+1:
+    #             need_a = False
+    #         else:
+    #             print("Try again on a for a unique problem")
+    #
+    #     key = "{} + {}".format(a, b)
+    #     if key in used_problems:
+    #         print("WARNING:  Duplicate problem: {}".format(key))
+    #
+    #     used_problems[key] = True;
+    #     c = a + b
+    #     problems.append({'type':'+', 'a':a, 'b':b, 'c':c})
+
+    # print("{} Subtraction Problems".format(num_sub))
+    # for i in range(num_sub):
+    #     idx = i % (max_num + 1)
+    #     # using sampling without replacement to better cover the space of
+    #     # a values.
+    #     if idx == 0:
+    #         a_vals = random.sample(a_vals, k=len(a_vals))
+    #     #a = random.randint(0, max_num)
+    #     a = a_vals[idx]
+    #     b = random.randint(0, a)
+    #     c = a - b
+    #     problems.append({'type':'-', 'a':a, 'b':b, 'c':c})
+    #
+    #     key = "{} - {}".format(a, b)
+    #     if key in used_problems:
+    #         print("WARNING:  Duplicate problem: {}".format(key))
+    #     used_problems[key] = True;
+
+    all_sub_problems = []
+    max_unique_sub = 0
+    for a in range(min_num, max_num + 1):
+        for b in range(min_num, a + 1):
+            c = a - b
+            all_sub_problems.append({"type": "-", "a": a, "b": b, "c": c})
+            max_unique_sub += 1
+    # print("all_sub_problems = {}".format(all_sub_problems))
+    # print("num = {}".format(len(all_sub_problems)))
+    print(
+        "maximum number of unique subtraction problems for max_num = {} is {}".format(
+            max_num, max_unique_sub
+        )
+    )
+    for i in range(num_sub):
+        idx = i % max_unique_sub
+        if idx == 0:
+            all_sub_problems = random.sample(all_sub_problems, k=max_unique_sub)
+        p = all_sub_problems[idx]
+        problems.append(p)
+        key = "{} - {}".format(p["a"], p["b"])
+        if key in used_problems:
+            print("WARNING:  Duplicate problem: {}".format(key))
+        used_problems[key] = True
+
+    print("{} Multiplication Problems".format(num_mul))
+    a_vals = list(range(min_mul, max_mul + 1))
+    for i in range(num_mul):
+        idx = i % (max_mul - min_mul + 1)
+        # using sampling without replacement to better cover the space of
+        # a values.
+        if idx == 0:
+            a_vals = random.sample(a_vals, k=len(a_vals))
+            b_vals = random.sample(a_vals, k=len(a_vals))
+        a = a_vals[idx]
+        b = b_vals[idx]
+        # a = random.randint(0, max_num)
+        # b = random.randint(0, max_mul)
+        c = a * b
+        problems.append({"type": "*", "a": a, "b": b, "c": c})
+        key = "{} * {}".format(a, b)
+        if key in used_problems:
+            print("WARNING:  Duplicate problem: {}".format(key))
+        used_problems[key] = True
+
+    print("{} Division Problems".format(num_div))
+    b_vals = list(range(1, max_mul + 1))
+    c_vals = list(range(0, max_mul + 1))
+    for i in range(num_div):
+        idxb = i % (max_mul)
+        idxc = i % (max_mul + 1)
+        # using sampling without replacement to better cover the space of
+        # a values.
+        if idxb == 0:
+            b_vals = random.sample(b_vals, k=len(b_vals))
+        if idxc == 0:
+            c_vals = random.sample(c_vals, k=len(c_vals))
+        b = b_vals[idxb]
+        c = c_vals[idxc]
+        # b = random.randint(1, max_mul)
+        # c = random.randint(0, max_mul)
+        a = b * c
+        problems.append({"type": "/", "a": a, "b": b, "c": c})
+        key = "{} / {}".format(a, b)
+        if key in used_problems:
+            print("WARNING:  Duplicate problem: {}".format(key))
+        used_problems[key] = True
+
+    if not args.skip_random:
+        max_shuffle = 100
+        random.shuffle(problems)
+        i = 1
+        while check_problems(problems) and i < max_shuffle:
+            print("Reshuffling...")
+            random.shuffle(problems)
+            i = i + 1
+
+    if args.verbose:
+        print_problems(problems)
+
+    pstr = ""
+    for p in problems + problemsx:
+        pstr += "| {} {} {}".format(p["type"], p["a"], p["b"])
+    h = hash(pstr)
+    print("Problem hash = {}".format(h))
+
+    # update the LaTeX file
+    latex_template_file = Path(args.latex_template)
+    latex_output_file = Path(args.latex_out)
+    update_latex(
+        latex_template_file,
+        latex_output_file,
+        problems + problemsx,
+        num_col=args.latex_columns,
+        num_row=args.latex_rows,
+        id=h,
+        test_mode=args.test_mode,
+        min_num=min_num,
+        max_num=max_num,
+        min_mul=min_mul,
+        max_mul=max_mul,
+        fortune_num=args.fortune_num,
+        name=args.name,
+    )
+    print(f"Finished creating {latex_output_file} from {latex_template_file}")
+
+    # FIXME -- consider running LaTeX and producing a PDF file.  Probably need a config
+    #          file option to control latex/pdflatex/dvips/ps2pdf/dvipdf/etc.
+    #
+    # FIXME -- consider even having an option to send to a printer.  This may not be
+    #          so fun across platforms
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    main(sys.argv[0], args)
