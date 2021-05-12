@@ -1,0 +1,22 @@
+#!/bin/sh
+
+out=mathymath_out
+
+./mathymath \
+    --test-mode \
+    --min_num 2 \
+    --max_num 10 \
+    --num_add 16 \
+    --num_sub 4 \
+    --max_mul 3 \
+    --num_mul 0 \
+    --num_div 0 \
+    --latex_columns 5  \
+    $*
+
+latex "${out}.tex"
+latex "${out}.tex"
+dvipdf "${out}.dvi" test.pdf
+
+/cygdrive/c/Program\ Files\ \(x86\)/Adobe/Acrobat\ Reader\ DC/Reader/AcroRd32.exe test.pdf
+

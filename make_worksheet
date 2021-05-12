@@ -1,0 +1,24 @@
+#!/bin/sh
+
+out=mathymath_out
+
+./mathymath \
+    --min_num 4 \
+    --max_num 12 \
+    --num_add 15 \
+    --num_sub 15 \
+    --num_addx 3 \
+    --num_subx 2 \
+    --min_mul 2 \
+    --max_mul 5 \
+    --num_mul 15 \
+    --num_div 0 \
+    --latex_columns 5 \
+    $*
+
+latex "${out}.tex"
+latex "${out}.tex"
+dvipdf "${out}.dvi" worksheet.pdf
+
+/cygdrive/c/Program\ Files\ \(x86\)/Adobe/Acrobat\ Reader\ DC/Reader/AcroRd32.exe worksheet.pdf
+
