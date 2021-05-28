@@ -107,7 +107,7 @@ def parse_arguments():
     )
 
     parser.add_argument(
-        "--fortune_num", type=int, default=False, help="specify which of the fortunes to use",
+        "--fortune_num", type=int, default=None, help="specify which of the fortunes to use",
     )
 
     parser.add_argument(
@@ -146,7 +146,7 @@ def check_problems(problems):
     return r
 
 
-def read_fortune(f="quotes.txt", num=False):
+def read_fortune(f="quotes.txt", num=None):
     """Read the fortunes file and pick one at random
     """
     fpath = Path(f)
@@ -158,7 +158,7 @@ def read_fortune(f="quotes.txt", num=False):
             if line and not line.startswith("#"):
                 quotes.append(line)
 
-    if num:
+    if num is not None:
         motd = quotes[num % len(quotes)]
     else:
         motd = random.choice(quotes)
