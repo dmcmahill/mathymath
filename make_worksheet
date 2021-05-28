@@ -5,13 +5,13 @@ out=mathymath_out
 ./mathymath \
     --min_num 4 \
     --max_num 12 \
-    --num_add 15 \
+    --num_add 10 \
     --num_sub 15 \
     --num_addx 3 \
     --num_subx 2 \
     --min_mul 2 \
-    --max_mul 5 \
-    --num_mul 15 \
+    --max_mul 8 \
+    --num_mul 20 \
     --num_div 0 \
     --latex_columns 5 \
     $*
